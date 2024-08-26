@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS "classes" (
 	"lower_age"	INTEGER,
 	"upper_age"	INTEGER,
 	"sex"	TEXT,
+    "is_random" INTEGER CHECK (is_random IN (0, 1)),
 	PRIMARY KEY("id" AUTOINCREMENT),
 	UNIQUE(name)
 );

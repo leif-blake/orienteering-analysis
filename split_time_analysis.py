@@ -10,100 +10,26 @@ import pandas as pd
 import random
 
 import plotter
-
-def get_random_classes(db_filename):
-    """
-    Gets class ids of all random classes in database
-    :param db_filename:
-    :return:
-    """
-
-    conn = sqlite3.connect(db_filename)
-    cursor = conn.cursor()
-
-    # Get all class ids from database
-    cursor.execute('SELECT id FROM classes ORDER BY id ASC')
-    class_id_rows = cursor.fetchall()
-
-    # Get all start times, associated with each athlete
-    query = ('SELECT results.race_id, competitor_id, start_time, class_id FROM results '
-             'INNER JOIN races_competitors ON results.card_no = races_competitors.card_no AND results.race_id = races_competitors.race_id ')
-    start_time_df = pd.read_sql_query(query, conn)
-
-    conn.close()
-
-    random_classes = []
-    for row in class_id_rows:
-        if is_random_class(start_time_df, row[0]):
-            random_classes.append(row[0])
-
-    return random_classes
+import utilities
 
 
-def is_random_class(start_time_df, class_id, num_iter=500, threshold=0.1):
-    """
-    Determines if class start times are randomly assigned across a multi-day event
-    :param class_id: Class id in Database
-    :return: True or False
-    """
-
-    # Retrieve class-specific start times
-    start_time_df_class = start_time_df[start_time_df['class_id'] == class_id]
-
-    # Calculate the midpoint of the start window for each day
-    mid_start_times = {}
-    race_ids = start_time_df_class['race_id'].unique()
-    for race_id in race_ids:
-        start_times = start_time_df_class[start_time_df_class['race_id'] == race_id]['start_time']
-        mid_start_times[race_id] = np.average(start_times)
-
-    # Calculate probability that a person is in the same "half" of the start window on two separate days
-    sum_prob = 0
-    prob_count = 0
-    for i in range(num_iter):
-        competitor_id = random.choice(list(start_time_df_class['competitor_id'].unique()))
-        rand_race_ids = random.sample(list(race_ids), 2)
-        try:
-            start_time_1 = start_time_df_class[(start_time_df_class['competitor_id'] == competitor_id)
-                                               & (start_time_df_class['race_id'] == rand_race_ids[0])]['start_time']
-            start_time_2 = start_time_df_class[(start_time_df_class['competitor_id'] == competitor_id)
-                                               & (start_time_df_class['race_id'] == rand_race_ids[1])]['start_time']
-            is_first_half_race_1 = 1 if start_time_1.iloc[0] < mid_start_times[rand_race_ids[0]] else 0
-            is_first_half_race_2 = 1 if start_time_2.iloc[0] < mid_start_times[rand_race_ids[1]] else 0
-        except TypeError:
-            continue
-        except IndexError:
-            continue
-        prob_count += 1
-        if is_first_half_race_1 == is_first_half_race_2:
-            sum_prob += 1
-
-    prob_same_half = sum_prob / prob_count
-
-    if prob_same_half > 0.5 + threshold:
-        return False
-
-    return True
-
-
-def import_all_splits(db_filename, race_id, random_classes_only=False, random_classes=[]):
+def import_all_splits(db_filename: str, race_id: str, class_list: list[str]=None):
     """
     Imports all split times between two consecutive controls for a given race_id
     :param db_filename: Path to the database file
     :param race_id: Race ID from database
-    :return: Dictionary with all legs and splits times, as well as standard deviation. Also return random classes
+    :param class_list: List of classes to import. If empty, import all classes
+    :return: Dictionary with all legs and splits times, as well as standard deviation
     """
-
-    # If flag is set, only use classes where start times are randomly assigned. Optionally get list from argument
-    if random_classes_only and random_classes == []:
-        random_classes = get_random_classes(db_filename)
 
     conn = sqlite3.connect(db_filename)
     cursor = conn.cursor()
 
-    if random_classes_only:
-        query = f'SELECT controls, control_times FROM results WHERE race_id = ? AND class_id IN ({",".join(["?"]*len(random_classes))})'
-        values = [race_id] + random_classes
+    if class_list is not None:
+        query = (f'SELECT controls, control_times FROM results INNER JOIN races_competitors '
+                 f'ON results.card_no = races_competitors.card_no AND results.race_id = races_competitors.race_id '
+                 f'WHERE results.race_id = ? AND class_id IN ({",".join(["?"]*len(class_list))})')
+        values = [race_id] + class_list
         cursor.execute(query, values)
     else:
         cursor.execute('SELECT controls, control_times FROM results WHERE race_id = ?', (race_id,))
@@ -138,7 +64,7 @@ def import_all_splits(db_filename, race_id, random_classes_only=False, random_cl
 
     conn.close()
 
-    return dict, random_classes
+    return dict
 
 
 def calc_split_performance(start_time, controls, control_times, splits_dict):
@@ -174,24 +100,25 @@ def calc_split_performance(start_time, controls, control_times, splits_dict):
     return split_performances
 
 
-def get_all_split_performances(db_filename, race_id, splits_dict, min_start_time=0, random_classes_only=False, random_classes=[]):
+def get_all_split_performances(db_filename, race_id, splits_dict, min_start_time=0, class_list: list[str]=None):
     """
     Gets normalized split performances for all competitors, removing reference to the competitors and control sequences
     :param db_filename: Database file path
     :param race_id: Race ID from database
+    :param splits_dict: Dictionary with all split times
+    :param min_start_time: Minimum start time of competitors
+    :param class_list: List of classes to import. If empty, import all classes
     :return: DataFrame with performances, normalized performances, and timestamps. Also return random classes
     """
-
-    # If flag is set, only use classes where start times are randomly assigned. Optionally get list from argument
-    if random_classes_only and random_classes == []:
-        random_classes = get_random_classes(db_filename)
 
     conn = sqlite3.connect(db_filename)
     cursor = conn.cursor()
 
-    if random_classes_only:
-        query = f'SELECT start_time, controls, control_times FROM results WHERE race_id = ? AND class_id IN ({",".join(["?"]*len(random_classes))})'
-        values = [race_id] + random_classes
+    if class_list is not None:
+        query = (f'SELECT start_time, controls, control_times FROM results INNER JOIN races_competitors '
+                 f'ON results.card_no = races_competitors.card_no AND results.race_id = races_competitors.race_id '
+                 f'WHERE results.race_id = ? AND class_id IN ({",".join(["?"] * len(class_list))})')
+        values = [race_id] + class_list
         cursor.execute(query, values)
     else:
         cursor.execute('SELECT start_time, controls, control_times FROM results WHERE race_id = ?', (race_id,))
@@ -211,7 +138,7 @@ def get_all_split_performances(db_filename, race_id, splits_dict, min_start_time
 
     conn.close()
 
-    return split_performances, random_classes
+    return split_performances
 
 
 if __name__ == '__main__':
@@ -232,8 +159,14 @@ if __name__ == '__main__':
     average_window = 60*30
     y_min_zoom = 0.6
     y_max_zoom = 1.4
-    use_start_time = False
+    use_start_time = True
     random_classes_only = True
+
+    # Populate list of classes with randomly assigned start. Functions will use all classes when set to None
+    if random_classes_only:
+        class_list = utilities.get_random_classes(db_file_path, pull_from_db=True)
+    else:
+        class_list = None
 
     # race_ids = [1, 2, 3, 4]
     race_ids = [1]
@@ -241,11 +174,10 @@ if __name__ == '__main__':
     for race_id in race_ids:
         cursor.execute('SELECT name FROM races WHERE id = ?', (race_id,))
         race_name = cursor.fetchone()[0]
-        splits_dict, random_classes = import_all_splits(db_file_path, race_id, random_classes_only=random_classes_only)
-        split_performances, _ = get_all_split_performances(db_file_path, race_id, splits_dict,
+        splits_dict = import_all_splits(db_file_path, race_id, class_list=class_list)
+        split_performances = get_all_split_performances(db_file_path, race_id, splits_dict,
                                                         min_start_time=min_start_time,
-                                                        random_classes_only=random_classes_only,
-                                                        random_classes=random_classes)
+                                                        class_list=class_list)
         plotter.plot_split_performances(split_performances, race_name, tz, average_window=average_window,
                                 use_start_time=use_start_time)
         plotter.plot_split_performances(split_performances, race_name, tz, y_min=y_min_zoom, y_max=y_max_zoom,

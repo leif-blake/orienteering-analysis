@@ -7,6 +7,10 @@ from tkinter import Tk
 from tkinter import filedialog
 from iof_xml_parser import parse_results_to_sqlite
 
+import utilities
+
+populate_random_classes = True
+
 if __name__ == '__main__':
     # Tk().withdraw()  # we don't want a full GUI, so keep the root window from appearing
 
@@ -47,5 +51,9 @@ if __name__ == '__main__':
 
         for xml_file_path in xml_file_paths:
             parse_results_to_sqlite(xml_file_path, db_file_path, tz)
+
+        # If flag is set, determine which classes have randomly assigned start times and add information to database
+        if populate_random_classes:
+            utilities.get_random_classes(db_file_path, write_to_db=True)
 
         print("Done loading xml results")
