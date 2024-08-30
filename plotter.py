@@ -21,15 +21,15 @@ def plot_split_performances(df: pd.DataFrame, race_name, tz, normalized=True, al
     :param y_min: Minimum y value for y axis
     :param y_max: Maximum y value for y axis
     :param average_window: Averaging window width for line in seconds
-    :param use_start_time: Whether to use start time for plotting. When false, use split timestamp
+    :param use_start_time: When True, use start time for x axis
     :return:
     """
 
-    column_name = 'normalized_performance' if normalized else 'performance'
+    perf_column = 'normalized_performance' if normalized else 'performance'
     time_column = 'start_time' if use_start_time else 'timestamp'
 
     # Get average line
-    averages_df = utilities.window_avg_line(df, column_name, time_column=time_column,
+    averages_df = utilities.window_avg_line(df, perf_column, time_column=time_column,
                                   average_window=average_window, time_step=time_step)
 
     # Convert Unix timestamps to datetime objects, adjust for time zone difference
@@ -42,8 +42,8 @@ def plot_split_performances(df: pd.DataFrame, race_name, tz, normalized=True, al
     plt.gca().xaxis.set_major_locator(mdates.HourLocator())  # set the x-axis major locator to show every hour
 
     # Create the plot
-    plt.plot(times, df[column_name], '.', alpha=alpha, color='darkorange')
-    plt.plot(average_times, averages_df[f'{column_name}_avg'], color='black')
+    plt.plot(times, df[perf_column], '.', alpha=alpha, color='darkorange')
+    plt.plot(average_times, averages_df[f'{perf_column}_avg'], color='black')
 
     plt.xlabel(f'{"Athlete Start Time" if use_start_time else "Time"} (hh:mm:ss)')
     plt.ylabel('Relative Performance (lower is better)')

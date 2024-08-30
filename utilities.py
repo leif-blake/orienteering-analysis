@@ -141,8 +141,9 @@ def get_random_classes(db_filename, pull_from_db=False, write_to_db=False):
 
     else:
         # Get all start times, associated with each athlete
-        query = ('SELECT results.race_id, competitor_id, start_time, class_id FROM results '
-                 'INNER JOIN races_competitors ON results.card_no = races_competitors.card_no AND results.race_id = races_competitors.race_id ')
+        query = ('SELECT results.race_id, competitor_id, start_time, class_id, classes.name FROM results '
+                 'INNER JOIN races_competitors ON results.card_no = races_competitors.card_no AND results.race_id = races_competitors.race_id '
+                 'INNER JOIN classes ON races_competitors.class_id = classes.id')
         start_time_df = pd.read_sql_query(query, conn)
 
         for row in class_id_rows:
@@ -163,27 +164,49 @@ def get_random_classes(db_filename, pull_from_db=False, write_to_db=False):
     return random_classes
 
 
-def is_random_class(start_time_df, class_id, num_iter=500, threshold=0.1):
+def is_random_class(start_time_df, class_id, num_iter=250, threshold=0.1, min_competitors=30, remove_elite=True, remove_mtb=True):
     """
     Determines if class start times are randomly assigned across a multi-day event
+    :param start_time_df: DataFrame containing start times of athletes across all days of competition
     :param class_id: Class id in Database
+    :param num_iter: Number of iterations to run
+    :param threshold: Threshold above 0.5 to determine if competitors are likely to start in the same half of the start window each day
+    :param min_competitors: If number of competitors in class falls below this threshold, declare as non-random
+    :param remove_elite: When true, declare all classes containing "E" in the name as non-random
+    :param remove_mtb: When true, declare all classes containing "MTB" in the name as non-random
     :return: True or False
     """
+
+    print(class_id)
 
     # Retrieve class-specific start times
     start_time_df_class = start_time_df[start_time_df['class_id'] == class_id]
 
-    # Calculate the midpoint of the start window for each day
+    # Remove elite classes if desired
+    if remove_elite and 'E' in start_time_df_class.iloc[0]['name']:
+        return False
+
+    # Remove MTBO classes if desired
+    if remove_mtb and 'MTB' in start_time_df_class.iloc[0]['name']:
+        return False
+
+# Calculate the midpoint of the start window for each day
     mid_start_times = {}
     race_ids = start_time_df_class['race_id'].unique()
+    if len(race_ids) < 2:
+        return False
     for race_id in race_ids:
         start_times = start_time_df_class[start_time_df_class['race_id'] == race_id]['start_time']
-        mid_start_times[race_id] = np.average(start_times)
+        # Remove class if it does not meet minimum competitor threshold
+        if len(start_times) < min_competitors:
+            return False
+        mid_start_times[race_id] = np.nanmean(start_times)  # Compute mean ignoring null start times
 
     # Calculate probability that a person is in the same "half" of the start window on two separate days
     sum_prob = 0
     prob_count = 0
     for i in range(num_iter):
+        # Choose random competitor and race_ids to compare
         competitor_id = random.choice(list(start_time_df_class['competitor_id'].unique()))
         rand_race_ids = random.sample(list(race_ids), 2)
         try:
@@ -201,6 +224,8 @@ def is_random_class(start_time_df, class_id, num_iter=500, threshold=0.1):
         if is_first_half_race_1 == is_first_half_race_2:
             sum_prob += 1
 
+    if prob_count < num_iter * 0.8:
+        return False
     prob_same_half = sum_prob / prob_count
 
     if prob_same_half > 0.5 + threshold:
