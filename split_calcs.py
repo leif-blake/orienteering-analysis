@@ -83,11 +83,12 @@ def import_all_splits(db_filename: str, class_list: list[str] = None):
     return splits_df
 
 
-def calc_split_performances(splits_df: pd.DataFrame, min_start_time=0):
+def calc_split_performances(splits_df: pd.DataFrame, min_start_time=0, max_start_time=86400):
     """
     Gets normalized split performances for all competitors from a splits dataframe
     :param splits_df: Dictionary with all split times
-    :param min_start_time: Minimum start time of competitors
+    :param min_start_time: Minimum start time of competitors (UTC time of day in seconds)
+    :param max_start_time: Maximum start time of competitors (UTC time of day in seconds)
     :return: DataFrame with performances, normalized performances, and timestamps. Also return random classes
     """
 
@@ -100,7 +101,9 @@ def calc_split_performances(splits_df: pd.DataFrame, min_start_time=0):
     split_perf_df = pd.DataFrame(columns=split_perf_columns)
 
     # Masks
-    start_time_mask = (splits_df['start_time'] != None) & (splits_df['start_time'] % 86400 >= min_start_time)
+    start_time_mask = ((splits_df['start_time'] != None)
+                       & (splits_df['start_time'] % 86400 >= min_start_time)
+                       & (splits_df['start_time'] % 86400 <= max_start_time))
 
     # Copy over existing columns from splits df, passing through mask
     split_perf_df['race_id'] = splits_df['race_id'][start_time_mask]
@@ -133,7 +136,8 @@ if __name__ == '__main__':
     folder_path = filedialog.askdirectory()
     db_file_paths = utilities.find_db_files(folder_path)
 
-    min_start_time = 4 * 3600  # To remove competitors given artificial start times of midnight
+    min_start_time = 6 * 3600  # To remove competitors given artificial start times of midnight
+    max_start_time = 11.75 * 3600 # To remove competitors with start times past the expected window
     random_classes_only = True
 
     for db_file_path in db_file_paths:
@@ -146,7 +150,7 @@ if __name__ == '__main__':
             class_list = None
 
         splits_df = import_all_splits(db_file_path, class_list=class_list)
-        split_performances = calc_split_performances(splits_df, min_start_time=min_start_time)
+        split_performances = calc_split_performances(splits_df, min_start_time=min_start_time, max_start_time=max_start_time)
 
         splits_df.to_pickle(db_file_path[:-3] + '_splits.pkl')
         split_performances.to_pickle(db_file_path[:-3] + '_splits_perf.pkl')
