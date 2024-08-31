@@ -37,9 +37,11 @@ if __name__ == '__main__':
             race_name = cursor.fetchone()[0]
             # plotter.plot_split_performances(split_performances, race_id, race_name, tz, average_window=average_window,
             #                         use_start_time=use_start_time)
-            plotter.plot_split_performances(split_performances, race_id, race_name, tz, y_min=y_min_zoom,
-                                            y_max=y_max_zoom,
-                                            average_window=average_window, use_start_time=use_start_time)
+            plotter.plot_split_perf_vs_time(split_performances, race_id, race_name, tz, y_min=y_min_zoom,
+                                            y_max=y_max_zoom, average_window=average_window,
+                                            use_start_time=use_start_time)
+            plotter.plot_split_vs_order(split_performances, race_id, race_name, tz, y_min=y_min_zoom,
+                                            y_max=y_max_zoom, order_avg_window=10, class_id=8, x_max=200)
 
         conn.close()
 

@@ -10,7 +10,7 @@ import matplotlib.dates as mdates
 import utilities
 
 
-def plot_split_performances(df: pd.DataFrame, race_id, race_name, tz, normalize_to_individual=False, normalize_to_class=True,
+def plot_split_perf_vs_time(df: pd.DataFrame, race_id, race_name, tz, normalize_to_individual=False, normalize_to_class=True,
                             alpha=0.2, y_min=None, y_max=None,
                             average_window=300, time_step=30, use_start_time=False):
     """
@@ -62,6 +62,64 @@ def plot_split_performances(df: pd.DataFrame, race_id, race_name, tz, normalize_
     # Set y_min/Y_max if desired
     if y_min is not None and y_max is not None:
         plt.ylim(y_min, y_max)
+
+    plt.tight_layout()
+    plt.show()
+
+def plot_split_vs_order(df: pd.DataFrame, race_id, race_name, normalize_to_individual=False, normalize_to_class=True,
+                        order_avg_window=5, order_avg_step=1, y_min=None, y_max=None, alpha=0.2, class_id=None,
+                        x_max=None):
+    """
+    This function plots the relative performance of a race split against the split order for a given race.
+
+    :param df: A pandas DataFrame containing the race data.
+    :param race_id: The ID of the race for which the plot is generated.
+    :param race_name: The name of the race.
+    :param normalize_to_individual: A boolean indicating whether the performance should be normalized to the individual.
+    :param normalize_to_class: A boolean indicating whether the performance should be normalized to the class.
+    :param order_avg_window: The window size for calculating the moving average of the performance.
+    :param order_avg_step: The step size for calculating the moving average of the performance.
+    :param y_min: The minimum value for the y-axis.
+    :param y_max: The maximum value for the y-axis.
+    :param alpha: The transparency level of the race points on the plot.
+    :param class_id: The ID of the class for which the plot is generated. Defaults to None, in which case all classes are used
+    :param x_max: The maximum value for the x-axis.
+    :return: None
+    """
+
+    # Build columns
+    perf_column = 'norm_' if normalize_to_individual else ''
+    perf_column += 'class_perf' if normalize_to_class else 'overall_perf'
+
+    # Define a mask to filter for race and class, if desired
+    if class_id is not None:
+        mask = (df['race_id'] == race_id) & (df['class_id'] == class_id)
+    else:
+        mask = (df['race_id'] == race_id)
+
+    # Get average line
+    averages_df = utilities.window_avg_line(df[mask], perf_column, time_column='split_order',
+                                            average_window=order_avg_window, time_step=order_avg_step)
+
+    # Create the plot
+    plt.plot(df[mask]['split_order'], df[mask][perf_column], '.', alpha=alpha,
+             color='darkorange')
+    plt.plot(averages_df['split_order'], averages_df[f'{perf_column}_avg'], color='black')
+
+    plt.xlabel('Split Order')
+    plt.ylabel('Relative Performance (lower is better)')
+    class_title_str = f', class {class_id}' if class_id is not None else ''
+    plt.title(f'{race_name}{class_title_str}\n'
+              f'{"Normalized " if normalize_to_individual else ""}Split Performance vs Split Order\n'
+              f'Line is moving average with {order_avg_window} width')
+    plt.grid(True)
+
+    # Set y_min/Y_max if desired
+    if y_min is not None and y_max is not None:
+        plt.ylim(y_min, y_max)
+
+    if x_max is not None:
+        plt.xlim(0, x_max)
 
     plt.tight_layout()
     plt.show()

@@ -125,6 +125,9 @@ def calc_split_performances(splits_df: pd.DataFrame, min_start_time=0, max_start
     split_perf_df['norm_overall_perf'] = split_perf_df.groupby(['race_id', 'competitor_id'])['overall_perf'].transform(
         lambda x: (x / x.mean()))
 
+    # Calculate number of split in sequence
+    split_perf_df['split_order'] = split_perf_df.sort_values('timestamp').groupby(['race_id', 'ctrl_seq']).cumcount()
+
     func_end_time = time.time()
     print('Time to calculate all split performances: ' + str(func_end_time - func_start_time))
 
