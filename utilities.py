@@ -8,6 +8,7 @@ import pandas as pd
 import numpy as np
 import sqlite3
 import random
+import os
 
 
 def get_offset_from_local(tz: float):
@@ -109,6 +110,7 @@ def window_avg_line(df, column_to_avg, time_column='timestamp', average_window=3
 
     return averages_df
 
+
 def get_random_classes(db_filename, pull_from_db=False, write_to_db=False):
     """
     Gets class ids of all random classes in database. Checks whether a user is more likely to start late on one day
@@ -190,7 +192,7 @@ def is_random_class(start_time_df, class_id, num_iter=250, threshold=0.1, min_co
     if remove_mtb and 'MTB' in start_time_df_class.iloc[0]['name']:
         return False
 
-# Calculate the midpoint of the start window for each day
+    # Calculate the midpoint of the start window for each day
     mid_start_times = {}
     race_ids = start_time_df_class['race_id'].unique()
     if len(race_ids) < 2:
@@ -232,3 +234,11 @@ def is_random_class(start_time_df, class_id, num_iter=250, threshold=0.1, min_co
         return False
 
     return True
+
+def find_db_files(folder_path):
+    db_files = []
+    for root, dirs, files in os.walk(folder_path):
+        for file in files:
+            if file.endswith(".db"):
+                db_files.append(os.path.join(root, file))
+    return db_files

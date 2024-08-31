@@ -129,26 +129,24 @@ def calc_split_performances(splits_df: pd.DataFrame, min_start_time=0):
 
 
 if __name__ == '__main__':
-    # Choose the database to use
-    db_file_path = filedialog.askopenfilename(
-        title="Open Event Database",
-        defaultextension=".db",
-        filetypes=[("SQLite3 Database", "*.db"), ("All Files", "*.*")]
-    )
-
-    print(db_file_path)
+    # Import all database paths
+    folder_path = filedialog.askdirectory()
+    db_file_paths = utilities.find_db_files(folder_path)
 
     min_start_time = 4 * 3600  # To remove competitors given artificial start times of midnight
     random_classes_only = True
 
-    # Populate list of classes with randomly assigned start. Functions will use all classes when set to None
-    if random_classes_only:
-        class_list = utilities.get_random_classes(db_file_path, pull_from_db=True)
-    else:
-        class_list = None
+    for db_file_path in db_file_paths:
+        print(db_file_path)
 
-    splits_df = import_all_splits(db_file_path, class_list=class_list)
-    split_performances = calc_split_performances(splits_df, min_start_time=min_start_time)
+        # Populate list of classes with randomly assigned start. Functions will use all classes when set to None
+        if random_classes_only:
+            class_list = utilities.get_random_classes(db_file_path, pull_from_db=True)
+        else:
+            class_list = None
 
-    splits_df.to_pickle(db_file_path[:-3] + '_splits.pkl')
-    split_performances.to_pickle(db_file_path[:-3] + '_splits_perf.pkl')
+        splits_df = import_all_splits(db_file_path, class_list=class_list)
+        split_performances = calc_split_performances(splits_df, min_start_time=min_start_time)
+
+        splits_df.to_pickle(db_file_path[:-3] + '_splits.pkl')
+        split_performances.to_pickle(db_file_path[:-3] + '_splits_perf.pkl')
