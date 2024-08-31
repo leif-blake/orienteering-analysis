@@ -10,12 +10,13 @@ import matplotlib.dates as mdates
 import utilities
 
 
-def plot_split_performances(df: pd.DataFrame, race_name, tz, normalize_to_individual=False, normalize_to_class=True,
+def plot_split_performances(df: pd.DataFrame, race_id, race_name, tz, normalize_to_individual=False, normalize_to_class=True,
                             alpha=0.2, y_min=None, y_max=None,
                             average_window=300, time_step=30, use_start_time=False):
     """
     Plots split performance against time (normalized or not)
     :param df: Split performances DataFrame
+    :param race_id: Race ID from database
     :param race_name: Name of the race
     :param tz: Timezone of the race
     :param normalize_to_individual: Whether to normalize the split performance for an individual athlete or not
@@ -34,12 +35,12 @@ def plot_split_performances(df: pd.DataFrame, race_name, tz, normalize_to_indivi
     time_column = 'start_time' if use_start_time else 'timestamp'
 
     # Get average line
-    averages_df = utilities.window_avg_line(df, perf_column, time_column=time_column,
+    averages_df = utilities.window_avg_line(df[df['race_id'] == race_id], perf_column, time_column=time_column,
                                             average_window=average_window, time_step=time_step)
 
     # Convert Unix timestamps to datetime objects, adjust for time zone difference
     tz_local_offset = utilities.get_offset_from_local(tz)
-    times = [datetime.datetime.fromtimestamp(ts + tz_local_offset) for ts in df[time_column]]
+    times = [datetime.datetime.fromtimestamp(ts + tz_local_offset) for ts in df[df['race_id'] == race_id][time_column]]
     average_times = [datetime.datetime.fromtimestamp(ts + tz_local_offset) for ts in averages_df[time_column]]
 
     # Format the x-axis to show time in hh:mm:ss
@@ -47,7 +48,7 @@ def plot_split_performances(df: pd.DataFrame, race_name, tz, normalize_to_indivi
     plt.gca().xaxis.set_major_locator(mdates.HourLocator())  # set the x-axis major locator to show every hour
 
     # Create the plot
-    plt.plot(times, df[perf_column], '.', alpha=alpha, color='darkorange')
+    plt.plot(times, df[df['race_id'] == race_id][perf_column], '.', alpha=alpha, color='darkorange')
     plt.plot(average_times, averages_df[f'{perf_column}_avg'], color='black')
 
     plt.xlabel(f'{"Athlete Start Time" if use_start_time else "Time"} (hh:mm:ss)')
