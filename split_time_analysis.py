@@ -7,7 +7,6 @@ from tkinter import filedialog
 import pandas as pd
 
 import plotter
-import utilities
 
 if __name__ == '__main__':
     # Choose the database to use
@@ -24,8 +23,8 @@ if __name__ == '__main__':
     cursor = conn.cursor()
 
     average_window = 60 * 30
-    y_min_zoom = 0.6
-    y_max_zoom = 1.4
+    y_min_zoom = 0.8
+    y_max_zoom = 1.2
     use_start_time = True
 
     split_performances = pd.read_pickle(db_file_path[:-3] + '_splits_perf.pkl')

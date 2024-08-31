@@ -24,6 +24,12 @@ def import_all_splits(db_filename: str, class_list: list[str] = None):
     conn = sqlite3.connect(db_filename)
     cursor = conn.cursor()
 
+    # Create indices if they don't exist
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_results_card_no_race_id ON results(card_no, race_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_races_competitors_card_no_race_id ON races_competitors(card_no, race_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_races_competitors_class_id ON races_competitors(class_id)')
+    conn.commit()
+
     query_start_time = time.time()
 
     query_base = (
@@ -130,7 +136,9 @@ if __name__ == '__main__':
         filetypes=[("SQLite3 Database", "*.db"), ("All Files", "*.*")]
     )
 
-    min_start_time = 7 * 3600  # To remove competitors given artificial start times of midnight
+    print(db_file_path)
+
+    min_start_time = 4 * 3600  # To remove competitors given artificial start times of midnight
     random_classes_only = True
 
     # Populate list of classes with randomly assigned start. Functions will use all classes when set to None
