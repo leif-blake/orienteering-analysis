@@ -8,6 +8,7 @@ import sqlite3
 from tkinter import filedialog
 import pandas as pd
 import time
+import numpy as np
 
 import utilities
 
@@ -125,8 +126,19 @@ def calc_split_performances(splits_df: pd.DataFrame, min_start_time=0, max_start
     split_perf_df['norm_overall_perf'] = split_perf_df.groupby(['race_id', 'competitor_id'])['overall_perf'].transform(
         lambda x: (x / x.mean()))
 
-    # Calculate number of split in sequence
+    # Calculate split_order
     split_perf_df['split_order'] = split_perf_df.sort_values('timestamp').groupby(['race_id', 'ctrl_seq']).cumcount()
+
+    # # Calculate split_order_at_start
+    # split_perf_df['split_order_at_start'] = np.nan
+    #
+    # # Iterate over each row to set the value
+    # for idx, row in split_perf_df.iterrows():
+    #     # Find the maximum split_order where timestamp is less than start_time for the current row
+    #     max_split_order = split_perf_df[(split_perf_df['race_id'] == row['race_id']) &
+    #                                     (split_perf_df['ctrl_seq'] < row['ctrl_seq']) &
+    #                                     (split_perf_df['timestamp'] < row['start_time'])]['split_order'].max()
+    #     split_perf_df.at[idx, 'split_order_at_start'] = max_split_order
 
     func_end_time = time.time()
     print('Time to calculate all split performances: ' + str(func_end_time - func_start_time))

@@ -235,6 +235,7 @@ def is_random_class(start_time_df, class_id, num_iter=250, threshold=0.1, min_co
 
     return True
 
+
 def find_db_files(folder_path):
     db_files = []
     for root, dirs, files in os.walk(folder_path):
