@@ -136,7 +136,7 @@ def calc_split_performances(splits_df: pd.DataFrame, min_start_time=0, max_start
     # Calculate split_order
     # ************************************************************************
 
-    split_perf_df['split_order'] = split_perf_df.sort_values('timestamp').groupby(['race_id', 'ctrl_seq']).cumcount()
+    split_perf_df['split_order'] = split_perf_df.groupby(['race_id', 'ctrl_seq'])['timestamp'].rank(method='min') - 1
 
     # ************************************************************************
     # Calculate split_order_at_start
@@ -156,7 +156,7 @@ def calc_split_performances(splits_df: pd.DataFrame, min_start_time=0, max_start
     combined_df = pd.concat([timestamp_df, start_time_df], ignore_index=True)
 
     # Calculate order of start times and timestamps combined
-    combined_df['split_order_combined'] = combined_df.sort_values('time').groupby(['race_id', 'ctrl_seq']).cumcount()
+    combined_df['split_order_combined'] = combined_df.groupby(['race_id', 'ctrl_seq'])['time'].rank(method='min') - 1
 
     split_order_combined_test = combined_df[combined_df['ctrl_seq'] == '127-192']
 
@@ -168,12 +168,14 @@ def calc_split_performances(splits_df: pd.DataFrame, min_start_time=0, max_start
     split_perf_df = split_perf_df.merge(combined_df[['start_time_index', 'split_order_combined']], left_index=True, right_on='start_time_index')
 
     # Calculate split order based on start time alone
-    split_perf_df['split_order_start'] = split_perf_df.sort_values('start_time').groupby(['race_id', 'ctrl_seq']).cumcount()
+    split_perf_df['split_order_start'] = split_perf_df.groupby(['race_id', 'ctrl_seq'])['start_time'].rank(method='min') - 1
 
     split_perf_df['split_order_at_start'] = split_perf_df['split_order_combined'] - split_perf_df['split_order_start']
 
     # Drop columns that are no longer needed
     split_perf_df.drop(columns=['start_time_index', 'split_order_combined', 'split_order_start'], inplace=True)
+
+    split_perf_test = split_perf_df[split_perf_df['ctrl_seq'] == '127-192']
 
     func_end_time = time.time()
     print('Time to calculate all split performances: ' + str(func_end_time - func_start_time))
