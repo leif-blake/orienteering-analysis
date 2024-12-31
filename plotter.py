@@ -92,7 +92,7 @@ def plot_split_perf_vs_time(df: pd.DataFrame, race_id, race_name, tz, normalize_
 
 def plot_split_vs_order(df: pd.DataFrame, race_id, race_name, normalize_to_individual=False, normalize_to_class=True,
                         order_avg_window=5, order_avg_step=1, y_min=None, y_max=None, alpha=0.2, class_id=None,
-                        order_cutoff=None, plot_trend=False, trend_type='linear', highlight_class_id=None):
+                        order_cutoff=None, plot_trend=False, trend_type='linear', highlight_class_id=None, split_order_at_start=False):
     """
     This function plots the relative performance of a race split against the split order for a given race.
 
@@ -111,12 +111,14 @@ def plot_split_vs_order(df: pd.DataFrame, race_id, race_name, normalize_to_indiv
     :param plot_trend: A boolean indicating whether the trend line should be plotted.
     :param trend_type: Type of trend to calculate. Defaults to 'linear'.
     :param highlight_class_id: Highlight data points from one class in a different color.
+    :param split_order_at_start: A boolean indicating whether the split order should be calculated at the athlete's start time
     :return: None
     """
 
     # Build columns
     perf_column = 'norm_' if normalize_to_individual else ''
     perf_column += 'class_perf' if normalize_to_class else 'overall_perf'
+    split_order_column = 'split_order' if not split_order_at_start else 'split_order_at_start'
 
     # Define a mask to filter for race and class, if desired
     if class_id is not None:
@@ -125,34 +127,34 @@ def plot_split_vs_order(df: pd.DataFrame, race_id, race_name, normalize_to_indiv
         mask = (df['race_id'] == race_id)
 
     # Get average line
-    averages_df = utilities.window_avg_line(df[mask], perf_column, time_column='split_order',
+    averages_df = utilities.window_avg_line(df[mask], perf_column, time_column=split_order_column,
                                             average_window=order_avg_window, time_step=order_avg_step)
 
     # Create the plot
     if class_id is None and highlight_class_id is not None:
         class_mask = df['class_id'] == highlight_class_id
-        plt.plot(df[mask & ~class_mask]['split_order'], df[mask & ~class_mask][perf_column], '.', alpha=alpha,
+        plt.plot(df[mask & ~class_mask][split_order_column], df[mask & ~class_mask][perf_column], '.', alpha=alpha,
                  color='darkorange')
-        plt.plot(df[mask & class_mask]['split_order'], df[mask & class_mask][perf_column], '.', color='blue', alpha=0.5,
+        plt.plot(df[mask & class_mask][split_order_column], df[mask & class_mask][perf_column], '.', color='blue', alpha=0.5,
                  label=f'Class {highlight_class_id}')
     else:
-        plt.plot(df[mask]['split_order'], df[mask][perf_column], '.', alpha=alpha,
+        plt.plot(df[mask][split_order_column], df[mask][perf_column], '.', alpha=alpha,
                  color='darkorange')
-    plt.plot(averages_df['split_order'], averages_df[f'{perf_column}_avg'], label=f'{order_avg_window}-width average',
+    plt.plot(averages_df[split_order_column], averages_df[f'{perf_column}_avg'], label=f'{order_avg_window}-width average',
              color='black')
 
     # Plot trend
     if plot_trend and class_id is not None:
         trend_params = stats.fit_split_perf_vs_order_class(df, race_id, class_id, normalize_to_class=normalize_to_class,
                                                            order_cutoff=order_cutoff)
-        plt.plot(averages_df['split_order'], trends.trend(averages_df['split_order'], trend_params, trend_type),
+        plt.plot(averages_df[split_order_column], trends.trend(averages_df[split_order_column], trend_params, trend_type),
                  label='Trend', color='red')
 
-    plt.xlabel('Split Order')
+    plt.xlabel(f'Split Order {"at Start" if split_order_at_start else ""}')
     plt.ylabel('Relative Performance (lower is better)')
     class_title_str = f', class {class_id}' if class_id is not None else ''
     plt.title(f'{race_name}{class_title_str}\n'
-              f'{"Normalized " if normalize_to_individual else ""}Split Performance vs Split Order')
+              f'{"Normalized " if normalize_to_individual else ""}Split Performance vs Split Order {"at Start" if split_order_at_start else ""}')
     plt.grid(True)
     plt.legend()
 
