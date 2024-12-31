@@ -114,31 +114,66 @@ def calc_split_performances(splits_df: pd.DataFrame, min_start_time=0, max_start
     split_perf_df['start_time'] = splits_df['start_time'][start_time_mask]
     split_perf_df['competitor_id'] = splits_df['competitor_id'][start_time_mask]
 
+    # ************************************************************************
     # Calculate performance by class and overall
+    # ************************************************************************
+
     split_perf_df['class_perf'] = splits_df.groupby(['race_id', 'ctrl_seq', 'class_id'])['split_time'].transform(
         lambda x: (x / x.mean()))
     split_perf_df['overall_perf'] = splits_df.groupby(['race_id', 'ctrl_seq'])['split_time'].transform(
         lambda x: (x / x.mean()))
 
+    # ************************************************************************
     # Calculate performance normalized to the individual
+    # ************************************************************************
+
     split_perf_df['norm_class_perf'] = split_perf_df.groupby(['race_id', 'competitor_id'])['class_perf'].transform(
         lambda x: (x / x.mean()))
     split_perf_df['norm_overall_perf'] = split_perf_df.groupby(['race_id', 'competitor_id'])['overall_perf'].transform(
         lambda x: (x / x.mean()))
 
+    # ************************************************************************
     # Calculate split_order
+    # ************************************************************************
+
     split_perf_df['split_order'] = split_perf_df.sort_values('timestamp').groupby(['race_id', 'ctrl_seq']).cumcount()
 
-    # # Calculate split_order_at_start
-    # split_perf_df['split_order_at_start'] = np.nan
-    #
-    # # Iterate over each row to set the value
-    # for idx, row in split_perf_df.iterrows():
-    #     # Find the maximum split_order where timestamp is less than start_time for the current row
-    #     max_split_order = split_perf_df[(split_perf_df['race_id'] == row['race_id']) &
-    #                                     (split_perf_df['ctrl_seq'] < row['ctrl_seq']) &
-    #                                     (split_perf_df['timestamp'] < row['start_time'])]['split_order'].max()
-    #     split_perf_df.at[idx, 'split_order_at_start'] = max_split_order
+    # ************************************************************************
+    # Calculate split_order_at_start
+    # ************************************************************************
+
+    # Create separate DataFrames for 'timestamp' and 'start_time'
+    timestamp_df = split_perf_df[['timestamp','race_id', 'ctrl_seq']].copy()
+    timestamp_df['time'] = timestamp_df['timestamp']
+    timestamp_df['start_time'] = None
+
+    start_time_df = split_perf_df[['start_time', 'race_id', 'ctrl_seq']].copy()
+    start_time_df['start_time_index'] = start_time_df.index
+    start_time_df['time'] = start_time_df['start_time']
+    start_time_df['timestamp'] = None
+
+    # Concatenate the DataFrames
+    combined_df = pd.concat([timestamp_df, start_time_df], ignore_index=True)
+
+    # Calculate order of start times and timestamps combined
+    combined_df['split_order_combined'] = combined_df.sort_values('time').groupby(['race_id', 'ctrl_seq']).cumcount()
+
+    split_order_combined_test = combined_df[combined_df['ctrl_seq'] == '127-192']
+
+    # Drop all rows where 'start_time' is None and timestamp column
+    combined_df = combined_df.dropna(subset=['start_time'])
+    combined_df.drop(columns=['timestamp'], inplace=True)
+
+    # Merge the combined DataFrame with the original DataFrame based on the index
+    split_perf_df = split_perf_df.merge(combined_df[['start_time_index', 'split_order_combined']], left_index=True, right_on='start_time_index')
+
+    # Calculate split order based on start time alone
+    split_perf_df['split_order_start'] = split_perf_df.sort_values('start_time').groupby(['race_id', 'ctrl_seq']).cumcount()
+
+    split_perf_df['split_order_at_start'] = split_perf_df['split_order_combined'] - split_perf_df['split_order_start']
+
+    # Drop columns that are no longer needed
+    split_perf_df.drop(columns=['start_time_index', 'split_order_combined', 'split_order_start'], inplace=True)
 
     func_end_time = time.time()
     print('Time to calculate all split performances: ' + str(func_end_time - func_start_time))
