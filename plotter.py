@@ -92,7 +92,7 @@ def plot_split_perf_vs_time(df: pd.DataFrame, race_id, race_name, tz, normalize_
 
 def plot_split_vs_order(df: pd.DataFrame, race_id, race_name, normalize_to_individual=False, normalize_to_class=True,
                         order_avg_window=5, order_avg_step=1, y_min=None, y_max=None, alpha=0.2, class_id=None,
-                        order_cutoff=None, plot_trend=False, trend_type='linear', highlight_class_id=None, split_order_at_start=False):
+                        order_cutoff=None, plot_trend=False, trend_type='linear', highlight_class_id=None, split_order_col='split_order'):
     """
     This function plots the relative performance of a race split against the split order for a given race.
 
@@ -107,18 +107,17 @@ def plot_split_vs_order(df: pd.DataFrame, race_id, race_name, normalize_to_indiv
     :param y_max: The maximum value for the y-axis.
     :param alpha: The transparency level of the race points on the plot.
     :param class_id: The ID of the class for which the plot is generated. Defaults to None, in which case all classes are used
-    :param x_max: The maximum value for the x-axis.
+    :param order_cutoff: The maximum value for split orders to plot.
     :param plot_trend: A boolean indicating whether the trend line should be plotted.
     :param trend_type: Type of trend to calculate. Defaults to 'linear'.
     :param highlight_class_id: Highlight data points from one class in a different color.
-    :param split_order_at_start: A boolean indicating whether the split order should be calculated at the athlete's start time
+    :param split_order_col: The column name for the split order. Defaults to 'split_order'.
     :return: None
     """
 
     # Build columns
     perf_column = 'norm_' if normalize_to_individual else ''
     perf_column += 'class_perf' if normalize_to_class else 'overall_perf'
-    split_order_column = 'split_order' if not split_order_at_start else 'split_order_at_start'
 
     # Define a mask to filter for race and class, if desired
     if class_id is not None:
@@ -127,20 +126,20 @@ def plot_split_vs_order(df: pd.DataFrame, race_id, race_name, normalize_to_indiv
         mask = (df['race_id'] == race_id)
 
     # Get average line
-    averages_df = utilities.window_avg_line(df[mask], perf_column, time_column=split_order_column,
+    averages_df = utilities.window_avg_line(df[mask], perf_column, time_column=split_order_col,
                                             average_window=order_avg_window, time_step=order_avg_step)
 
     # Create the plot
     if class_id is None and highlight_class_id is not None:
         class_mask = df['class_id'] == highlight_class_id
-        plt.plot(df[mask & ~class_mask][split_order_column], df[mask & ~class_mask][perf_column], '.', alpha=alpha,
+        plt.plot(df[mask & ~class_mask][split_order_col], df[mask & ~class_mask][perf_column], '.', alpha=alpha,
                  color='darkorange')
-        plt.plot(df[mask & class_mask][split_order_column], df[mask & class_mask][perf_column], '.', color='blue', alpha=0.5,
+        plt.plot(df[mask & class_mask][split_order_col], df[mask & class_mask][perf_column], '.', color='blue', alpha=0.5,
                  label=f'Class {highlight_class_id}')
     else:
-        plt.plot(df[mask][split_order_column], df[mask][perf_column], '.', alpha=alpha,
+        plt.plot(df[mask][split_order_col], df[mask][perf_column], '.', alpha=alpha,
                  color='darkorange')
-    plt.plot(averages_df[split_order_column], averages_df[f'{perf_column}_avg'], label=f'{order_avg_window}-width average',
+    plt.plot(averages_df[split_order_col], averages_df[f'{perf_column}_avg'], label=f'{order_avg_window}-width average',
              color='black')
 
     # Plot trend
@@ -148,19 +147,29 @@ def plot_split_vs_order(df: pd.DataFrame, race_id, race_name, normalize_to_indiv
         if class_id is None:
             trend_params = stats.fit_split_perf_vs_order(df, race_id,
                                                                normalize_to_class=normalize_to_class,
-                                                               order_cutoff=order_cutoff, split_order_at_start=split_order_at_start,
+                                                               order_cutoff=order_cutoff, split_order_col=split_order_col,
                                                                      trend_type=trend_type)
         else:
             trend_params = stats.fit_split_perf_vs_order_class(df, race_id, class_id, normalize_to_class=normalize_to_class,
                                                                order_cutoff=order_cutoff, trend_type=trend_type)
-        plt.plot(averages_df[split_order_column], trends.trend(averages_df[split_order_column], trend_params, trend_type),
+        plt.plot(averages_df[split_order_col], trends.trend(averages_df[split_order_col], trend_params, trend_type),
                  label='Trend', color='red')
 
-    plt.xlabel(f'Split Order {"at Start" if split_order_at_start else ""}')
+    # Select split order title on x axis
+    if split_order_col == 'split_order':
+        plt.xlabel('Split Order')
+    elif split_order_col == 'split_order_at_exp_timestamp':
+        plt.xlabel('Split Order at Expected Time at Leg')
+    elif split_order_col == 'split_order_at_start':
+        plt.xlabel('Split Order at Start')
+    else:
+        plt.xlabel(f'Split Order (from column {split_order_col})')
+
+    plt.xlabel(f'Split Order (from column {split_order_col})')
     plt.ylabel('Relative Performance (lower is better)')
     class_title_str = f', class {class_id}' if class_id is not None else ''
     plt.title(f'{race_name}{class_title_str}\n'
-              f'{"Normalized " if normalize_to_individual else ""}Split Performance vs Split Order {"at Start" if split_order_at_start else ""}')
+              f'{"Normalized " if normalize_to_individual else ""}Split Performance vs Split Order')
     plt.grid(True)
     plt.legend()
 
@@ -173,6 +182,11 @@ def plot_split_vs_order(df: pd.DataFrame, race_id, race_name, normalize_to_indiv
 
     plt.tight_layout()
     plt.show()
+
+    if plot_trend:
+        return trend_params
+    else:
+        return None
 
 
 def plot_all_split_vs_order_trends(df: pd.DataFrame, race_id, race_name, normalize_to_class=True,

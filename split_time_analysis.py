@@ -18,8 +18,8 @@ if __name__ == '__main__':
     # tz = -4 # Ontario Summer time
     tz = +2  # Sweden Summer time
 
-    # race_ids = [1, 2, 3, 4]
-    race_ids = [2]
+    race_ids = [1, 2, 3, 4]
+    # race_ids = [2]
     average_window = 60 * 30
     y_min_zoom = 0.8
     y_max_zoom = 1.2
@@ -52,7 +52,7 @@ if __name__ == '__main__':
             #                             highlight_class_id=class_to_highlight)
             plotter.plot_split_vs_order(split_performances, race_id, race_name, order_avg_window=15, y_min=y_min_zoom,
                                         y_max=y_max_zoom, order_cutoff=split_order_cutoff,
-                                        highlight_class_id=class_to_highlight, split_order_at_start=True, plot_trend=plot_trend,
+                                        highlight_class_id=class_to_highlight, split_order_col='split_order_at_exp_timestamp', plot_trend=plot_trend,
                                         trend_type=trend_type)
             # for index, class_id_to_plot in enumerate(class_ids_to_plot):
             #     if index % 10 != 0:
