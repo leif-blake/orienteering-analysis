@@ -144,9 +144,15 @@ def plot_split_vs_order(df: pd.DataFrame, race_id, race_name, normalize_to_indiv
              color='black')
 
     # Plot trend
-    if plot_trend and class_id is not None:
-        trend_params = stats.fit_split_perf_vs_order_class(df, race_id, class_id, normalize_to_class=normalize_to_class,
-                                                           order_cutoff=order_cutoff)
+    if plot_trend:
+        if class_id is None:
+            trend_params = stats.fit_split_perf_vs_order(df, race_id,
+                                                               normalize_to_class=normalize_to_class,
+                                                               order_cutoff=order_cutoff, split_order_at_start=split_order_at_start,
+                                                                     trend_type=trend_type)
+        else:
+            trend_params = stats.fit_split_perf_vs_order_class(df, race_id, class_id, normalize_to_class=normalize_to_class,
+                                                               order_cutoff=order_cutoff, trend_type=trend_type)
         plt.plot(averages_df[split_order_column], trends.trend(averages_df[split_order_column], trend_params, trend_type),
                  label='Trend', color='red')
 
