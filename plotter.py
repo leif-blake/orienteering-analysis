@@ -436,13 +436,15 @@ def plot_exp_split_order_vs_split_order_hist(df: pd.DataFrame, race_id, race_nam
     plt.show()
 
 
-def plot_box_whisker(data, x_values, title, x_label, y_label):
+def plot_box_whisker(data, x_values, title, x_label, y_label, y_min=None, y_max=None):
     """
     :param data: A list of pandas Series containing the data to be plotted.
     :param x_values: A list of x values for the data.
     :param title: The title of the plot.
     :param x_label: The label for the x axis.
     :param y_label: The label for the y axis.
+    :param y_min: The minimum value for the y axis.
+    :param y_max: The maximum value for the y axis.
     :return: None
 
     This function plots a series of vertical box-whisker plots for a given set of data. The data is partitioned based on
@@ -462,6 +464,10 @@ def plot_box_whisker(data, x_values, title, x_label, y_label):
 
     # Set x limits slightly above and below the x values
     plt.xlim(x_values[0] - box_width, x_values[-1] + box_width)
+
+    # Set y_min/Y_max if desired
+    if y_min is not None and y_max is not None:
+        plt.ylim(y_min, y_max)
 
     # Set autolocater for x tick values
     ax = plt.gca()
