@@ -7,6 +7,7 @@ from tkinter import filedialog
 import pandas as pd
 
 import plotter
+import stats
 import utilities
 import numpy as np
 
@@ -30,43 +31,82 @@ if __name__ == '__main__':
     trend_type = 'linear'
     class_to_highlight = None
 
-    # List of trend slopes
-    slopes = []
-    intercepts = []
-    adj_slopes = []
+    # ****************************************************************************
+    # Plot split order vs time
+    # ****************************************************************************
 
-    total_rows = 0
+    # # List of trend slopes
+    # slopes = []
+    # intercepts = []
+    # adj_slopes = []
+    #
+    # total_rows = 0
+    #
+    # for db_file_path in db_file_paths:
+    #     conn = sqlite3.connect(db_file_path)
+    #     cursor = conn.cursor()
+    #
+    #     splits_df = pd.read_pickle(db_file_path[:-3] + '_splits.pkl')
+    #     split_performances = pd.read_pickle(db_file_path[:-3] + '_splits_perf.pkl')
+    #     total_rows += len(split_performances)
+    #
+    #     for race_id in race_ids:
+    #         cursor.execute('SELECT name FROM races WHERE id = ?', (race_id,))
+    #         race_name = cursor.fetchone()[0]
+    #         class_ids_to_plot = splits_df[splits_df['race_id'] == race_id]['class_id'].unique()
+    #         trend_params = plotter.plot_split_vs_order(split_performances, race_id, race_name, order_avg_window=15, y_min=y_min_zoom,
+    #                                     y_max=y_max_zoom, order_cutoff=split_order_cutoff,
+    #                                     highlight_class_id=class_to_highlight, split_order_col='split_order_at_exp_timestamp', plot_trend=plot_trend,
+    #                                     trend_type=trend_type)
+    #         slopes.append(trend_params[0])
+    #         intercepts.append(trend_params[1])
+    #         adj_slopes.append(trend_params[0] / trend_params[1])
+    #
+    #         # Plot split order vs time
+    #         # plotter.plot_split_order_vs_time(split_performances, race_id, race_name, tz, average_window=average_window,
+    #         #                                  highlight_class_id=class_to_highlight, order_cutoff=split_order_cutoff)
+    #         # plotter.plot_exp_split_order_vs_split_order_hist(split_performances, race_id, race_name, order_cutoff=split_order_cutoff)
+    #
+    #     conn.close()
+    #
+    #     print("Done one file")
+    #
+    # print(f'Slope avg: {sum(slopes) / len(slopes)}, std: {np.std(slopes)}')
+    # print(f'Intercept avg: {sum(intercepts) / len(intercepts)}, std: {np.std(intercepts)}')
+    # print(f'Adj slope avg: {sum(adj_slopes) / len(adj_slopes)}, std: {np.std(adj_slopes)}')
+    # print(f'Total rows: {total_rows}')
 
-    for db_file_path in db_file_paths:
-        conn = sqlite3.connect(db_file_path)
-        cursor = conn.cursor()
+    # ****************************************************************************
+    # Plot box plot of trend slopes
+    # ****************************************************************************
 
-        splits_df = pd.read_pickle(db_file_path[:-3] + '_splits.pkl')
-        split_performances = pd.read_pickle(db_file_path[:-3] + '_splits_perf.pkl')
-        total_rows += len(split_performances)
+    trend_slopes_df = pd.DataFrame()
+    split_order_cutoffs = np.arange(50, 1050, 50)
 
-        for race_id in race_ids:
-            cursor.execute('SELECT name FROM races WHERE id = ?', (race_id,))
-            race_name = cursor.fetchone()[0]
-            class_ids_to_plot = splits_df[splits_df['race_id'] == race_id]['class_id'].unique()
-            trend_params = plotter.plot_split_vs_order(split_performances, race_id, race_name, order_avg_window=15, y_min=y_min_zoom,
-                                        y_max=y_max_zoom, order_cutoff=split_order_cutoff,
-                                        highlight_class_id=class_to_highlight, split_order_col='split_order_at_exp_timestamp', plot_trend=plot_trend,
-                                        trend_type=trend_type)
-            slopes.append(trend_params[0])
-            intercepts.append(trend_params[1])
-            adj_slopes.append(trend_params[0] / trend_params[1])
+    for split_order_cutoff in split_order_cutoffs:
+        adj_slopes = []
 
-            # Plot split order vs time
-            # plotter.plot_split_order_vs_time(split_performances, race_id, race_name, tz, average_window=average_window,
-            #                                  highlight_class_id=class_to_highlight, order_cutoff=split_order_cutoff)
-            # plotter.plot_exp_split_order_vs_split_order_hist(split_performances, race_id, race_name, order_cutoff=split_order_cutoff)
+        for db_file_path in db_file_paths:
+            conn = sqlite3.connect(db_file_path)
+            cursor = conn.cursor()
 
-        conn.close()
+            split_performances = pd.read_pickle(db_file_path[:-3] + '_splits_perf.pkl')
 
-        print("Done one file")
+            for race_id in race_ids:
+                cursor.execute('SELECT name FROM races WHERE id = ?', (race_id,))
+                race_name = cursor.fetchone()[0]
+                trend_params = stats.fit_split_perf_vs_order(split_performances, race_id,
+                                                             order_cutoff=split_order_cutoff, split_order_col='split_order_at_exp_timestamp',
+                                                             trend_type=trend_type)
+                adj_slopes.append(trend_params[0] / trend_params[1])
 
-    print(f'Slope avg: {sum(slopes) / len(slopes)}, std: {np.std(slopes)}')
-    print(f'Intercept avg: {sum(intercepts) / len(intercepts)}, std: {np.std(intercepts)}')
-    print(f'Adj slope avg: {sum(adj_slopes) / len(adj_slopes)}, std: {np.std(adj_slopes)}')
-    print(f'Total rows: {total_rows}')
+
+            conn.close()
+
+            print(f"Done evaluating database {db_file_path} for split order cutoff {split_order_cutoff}")
+
+        trend_slopes_df[f'{split_order_cutoff}'] = adj_slopes
+
+    plotter.plot_box_whisker(trend_slopes_df, split_order_cutoffs,
+                             'Adjusted trend slope vs split order cutoff',
+                             'Split order cutoff', 'Adjusted trend slope')

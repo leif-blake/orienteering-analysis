@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import datetime
 import matplotlib.dates as mdates
+from matplotlib.ticker import AutoLocator, ScalarFormatter
 
 import utilities
 import stats
@@ -432,4 +433,40 @@ def plot_exp_split_order_vs_split_order_hist(df: pd.DataFrame, race_id, race_nam
     plt.ylabel('Frequency')
     plt.xlim(-100, 100)
     plt.grid(True)
+    plt.show()
+
+
+def plot_box_whisker(data, x_values, title, x_label, y_label):
+    """
+    :param data: A list of pandas Series containing the data to be plotted.
+    :param x_values: A list of x values for the data.
+    :param title: The title of the plot.
+    :param x_label: The label for the x axis.
+    :param y_label: The label for the y axis.
+    :return: None
+
+    This function plots a series of vertical box-whisker plots for a given set of data. The data is partitioned based on
+    the x values provided. The y-series data should be arranged in the dataframe in columns
+    """
+
+    # Set appropriate width of boxes as average of x value spacing
+    box_width = np.mean(np.diff(x_values)) * 0.4
+
+    # Create the plot
+    plt.boxplot(data, positions=x_values, showfliers=False, widths=box_width)
+
+    plt.xlabel(x_label)
+    plt.ylabel(y_label)
+    plt.title(title)
+    plt.grid(True)
+
+    # Set x limits slightly above and below the x values
+    plt.xlim(x_values[0] - box_width, x_values[-1] + box_width)
+
+    # Set autolocater for x tick values
+    ax = plt.gca()
+    ax.xaxis.set_major_locator(AutoLocator())
+    ax.xaxis.set_major_formatter(ScalarFormatter())
+
+    plt.tight_layout()
     plt.show()

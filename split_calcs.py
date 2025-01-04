@@ -208,8 +208,6 @@ def calc_split_performances(splits_df: pd.DataFrame, min_start_time=0, max_start
     # Calculate the order of competitors at the expected timestamp
     split_perf_df = split_order_arbitrary_time_col(split_perf_df, 'exp_timestamp', 'split_order_at_exp_timestamp')
 
-
-
     func_end_time = time.time()
     print('Time to calculate all split performances: ' + str(func_end_time - func_start_time))
 
