@@ -152,8 +152,23 @@ def plot_split_vs_order(df: pd.DataFrame, race_id, race_name, normalize_to_indiv
         else:
             trend_params = stats.fit_split_perf_vs_order_class(df, race_id, class_id, normalize_to_class=normalize_to_class,
                                                                order_cutoff=order_cutoff, trend_type=trend_type)
-        plt.plot(averages_df[split_order_col], trends.trend(averages_df[split_order_col], trend_params, trend_type),
-                 label='Trend', color='red')
+
+        # Get appropriate x range
+        if order_cutoff is None:
+            trend_x_series = np.arange(0, df[mask][split_order_col].max())
+        else:
+            trend_x_series = np.arange(0, order_cutoff)
+
+        # Plot trend line
+        if trend_type == 'linear':
+            plt.plot(trend_x_series,
+                     trends.trend(trend_x_series, trend_params, trend_type),
+                     label=f'Trend: {trend_params[0]:.6f}x + {trend_params[1]:.3f}', color='red')
+        else:
+            plt.plot(trend_x_series,
+                     trends.trend(trend_x_series, trend_params, trend_type),
+                     label='Trend', color='red')
+
 
     # Select split order title on x axis
     if split_order_col == 'split_order':
@@ -165,7 +180,6 @@ def plot_split_vs_order(df: pd.DataFrame, race_id, race_name, normalize_to_indiv
     else:
         plt.xlabel(f'Split Order (from column {split_order_col})')
 
-    plt.xlabel(f'Split Order (from column {split_order_col})')
     plt.ylabel('Relative Performance (lower is better)')
     class_title_str = f', class {class_id}' if class_id is not None else ''
     plt.title(f'{race_name}{class_title_str}\n'
@@ -293,7 +307,7 @@ def plot_split_perf_vs_order_trends_competitor(df: pd.DataFrame, race_id, race_n
 
 def plot_split_order_vs_time(df: pd.DataFrame, race_id, race_name, tz, use_start_time=False, highlight_class_id=None,
                              y_min=None, y_max=None, alpha=0.2, order_cutoff=None, average_window=300,
-                             time_step=30):
+                             time_step=30, split_order_col='split_order'):
     """
     Function to plot split order against time for a given race.
     
@@ -314,7 +328,7 @@ def plot_split_order_vs_time(df: pd.DataFrame, race_id, race_name, tz, use_start
 
     # Define a mask to filter for the race
     if order_cutoff is not None:
-        race_mask = (df['race_id'] == race_id) & (df['split_order'] <= order_cutoff)
+        race_mask = (df['race_id'] == race_id) & (df[split_order_col] <= order_cutoff)
     else:
         race_mask = df['race_id'] == race_id
 
@@ -323,10 +337,10 @@ def plot_split_order_vs_time(df: pd.DataFrame, race_id, race_name, tz, use_start
 
     # Extract time and split_order columns
     times = df[race_mask][time_column]
-    split_orders = df[race_mask]['split_order']
+    split_orders = df[race_mask][split_order_col]
 
     # Get average line
-    averages_df = utilities.window_avg_line(df[race_mask], 'split_order', time_column=time_column,
+    averages_df = utilities.window_avg_line(df[race_mask], split_order_col, time_column=time_column,
                                             average_window=average_window, time_step=time_step)
 
     # For adjusting time to local race time
@@ -357,12 +371,65 @@ def plot_split_order_vs_time(df: pd.DataFrame, race_id, race_name, tz, use_start
     plt.title(f'{race_name}\nSplit Order vs {"Athlete Start Time" if use_start_time else "Timestamp"}')
 
     plt.grid(True)
-    if highlight_class_id is not None:
-        plt.legend()
+    plt.legend()
 
     # Set y_min/y_max if desired
     if y_min is not None and y_max is not None:
         plt.ylim(y_min, y_max)
 
     plt.tight_layout()
+    plt.show()
+
+def plot_exp_split_order_vs_split_order(df: pd.DataFrame, race_id, race_name, order_cutoff=None, alpha=0.2):
+    """
+    This function plots the error in split order at expected time against the true split order for a given race
+    :param df: A pandas DataFrame containing
+    :param race_id: unique identifier for the race
+    :param race_name: name of the race
+    :return: None
+    """
+
+    # Define a mask to filter for the race
+    if order_cutoff is not None:
+        race_mask = (df['race_id'] == race_id) & (df['split_order'] <= order_cutoff)
+    else:
+        race_mask = df['race_id'] == race_id
+
+    plt.plot(df['split_order'][race_mask], df['split_order_at_exp_timestamp'][race_mask] - df['split_order'][race_mask], '.', alpha=alpha, color='darkorange')
+
+    plt.title(f'{race_name}\nError in Split Order at Expected Time vs Split Order')
+    plt.xlabel('Split Order')
+    plt.ylabel('Error in Split Order at Expected Time')
+    plt.grid(True)
+    plt.show()
+
+
+def plot_exp_split_order_vs_split_order_hist(df: pd.DataFrame, race_id, race_name, order_cutoff=None, alpha=1):
+    """
+    This function plots a histogram of the error in split order at expected time against the true split order
+    :param df: A pandas DataFrame containing
+    :param race_id: unique identifier for the race
+    :param race_name: name of the race
+    :param order_cutoff: Maximum value for split orders to plot
+    :param alpha: Transparency level for the histogram
+    :return: None
+    """
+
+    # Define a mask to filter for the race
+    if order_cutoff is not None:
+        race_mask = (df['race_id'] == race_id) & (df['split_order'] <= order_cutoff)
+    else:
+        race_mask = df['race_id'] == race_id
+
+    # Calculate the error in split order at expected time
+    error = df['split_order_at_exp_timestamp'][race_mask] - df['split_order'][race_mask]
+
+    # Plot the histogram
+    plt.hist(error, bins=500, alpha=alpha, color='darkorange', edgecolor='black')
+
+    plt.title(f'{race_name}\nHistogram of Error in Split Order at Expected Time')
+    plt.xlabel('Error in Split Order at Expected Time')
+    plt.ylabel('Frequency')
+    plt.xlim(-100, 100)
+    plt.grid(True)
     plt.show()

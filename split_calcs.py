@@ -78,7 +78,7 @@ def import_all_splits(db_filename: str, class_list: list[str] = None):
 
     splits_df = pd.DataFrame(splits_dict_list)
 
-    # Drop any rows where split_time is negative or greater than 5 hours
+    # Drop any rows where split_time is negative or greater than 5 hours, this is likely invalid data
     splits_df = splits_df[splits_df['split_time'] >= 0]
     splits_df = splits_df[splits_df['split_time'] <= 5 * 3600]
 
