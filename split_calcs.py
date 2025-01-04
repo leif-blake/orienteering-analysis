@@ -78,6 +78,10 @@ def import_all_splits(db_filename: str, class_list: list[str] = None):
 
     splits_df = pd.DataFrame(splits_dict_list)
 
+    # Drop any rows where split_time is negative or greater than 5 hours
+    splits_df = splits_df[splits_df['split_time'] >= 0]
+    splits_df = splits_df[splits_df['split_time'] <= 5 * 3600]
+
     func_end_time = time.time()
     print('Total time to import splits: ' + str(func_end_time - func_start_time))
 
@@ -161,7 +165,7 @@ def calc_split_performances(splits_df: pd.DataFrame, min_start_time=0, max_start
     split_perf_df['competitor_id'] = splits_df['competitor_id'][start_time_mask]
 
     # ************************************************************************
-    # Calculate performance by class and overall
+    # Calculate performance by class and overall, normalized to mean
     # ************************************************************************
 
     split_perf_df['class_perf'] = splits_df.groupby(['race_id', 'ctrl_seq', 'class_id'])['split_time'].transform(
@@ -170,7 +174,7 @@ def calc_split_performances(splits_df: pd.DataFrame, min_start_time=0, max_start
         lambda x: (x / x.mean()))
 
     # ************************************************************************
-    # Calculate performance normalized to the individual
+    # Calculate performance normalized to the individual, normalized to mean
     # ************************************************************************
 
     split_perf_df['norm_class_perf'] = split_perf_df.groupby(['race_id', 'competitor_id'])['class_perf'].transform(
@@ -204,8 +208,7 @@ def calc_split_performances(splits_df: pd.DataFrame, min_start_time=0, max_start
     # Calculate the order of competitors at the expected timestamp
     split_perf_df = split_order_arbitrary_time_col(split_perf_df, 'exp_timestamp', 'split_order_at_exp_timestamp')
 
-    # subset of the data to check validity in debugger
-    split_perf_df_test = split_perf_df[split_perf_df['ctrl_seq'] == '127-192']
+
 
     func_end_time = time.time()
     print('Time to calculate all split performances: ' + str(func_end_time - func_start_time))
