@@ -10,16 +10,19 @@ import pandas as pd
 import numpy as np
 from tkinter import filedialog
 import time
+import scipy.stats as stats
 
 import utilities
 
 
-def simulate_split_performance(input_split_df, split_order_perf_trend=0.0, class_perf_var=0.1, competitor_perf_var=0.1):
+def simulate_split_performance(input_split_df, split_order_perf_trend=0.0, class_perf_var=0.1):
     # *************************************************************
     # Calculate data required from existing split performance data
     # *************************************************************
 
     # Temporarily reduce to one race and one class for testing
+    # input_split_df = input_split_df[
+    #     (input_split_df['race_id'] == 1) & (input_split_df['class_id'].isin([7, 8, 9, 10]))].copy()
     input_split_df = input_split_df[(input_split_df['race_id'] == 1)].copy()
 
     start_time = time.time()
@@ -73,13 +76,19 @@ def simulate_split_performance(input_split_df, split_order_perf_trend=0.0, class
 
     # Grouping by class_id, add a new column with randomized natural performance. Multiply by an additional random number
     # to simulate the overall performance level of the class
+    # Standardize the bounds for class performance
+    a_std = (0.5 - 1) / class_perf_var
+    b_std = (1.5 - 1) / class_perf_var
     for class_id in sim_splits_df['class_id'].unique():
         class_mask = sim_splits_df['class_id'] == class_id
-        class_comp = sim_splits_df[class_mask]['competitor_id'].unique()
-        comp_perf = np.random.normal(1, competitor_perf_var, len(class_comp))
-        comp_perf_dict = dict(zip(class_comp, comp_perf))
+        class_competitors = sim_splits_df[class_mask]['competitor_id'].unique()
+        # Create a distorted gamma distribution with a mean of 1
+        comp_perf = np.random.gamma(2, 1 / 1.5, len(class_competitors)) + 1.2
+        comp_perf = comp_perf / np.mean(comp_perf)
+        comp_perf_dict = dict(zip(class_competitors, comp_perf))
         sim_splits_df.loc[class_mask, 'nat_perf'] = (sim_splits_df.loc[class_mask, 'competitor_id'].map(comp_perf_dict)
-                                                     * np.random.normal(1, class_perf_var, 1))
+                                                     * stats.truncnorm(a_std, b_std, loc=1, scale=class_perf_var).rvs(
+                    1))
 
     # Normalize natural performance across all classes to have a mean of 1
     sim_splits_df['nat_perf'] = sim_splits_df['nat_perf'] / np.mean(sim_splits_df['nat_perf'])
@@ -99,7 +108,8 @@ def simulate_split_performance(input_split_df, split_order_perf_trend=0.0, class
     # plus the average time to reach the first control
     first_split_mask = sim_splits_df['leg_order'] == 0
     sim_splits_df.loc[first_split_mask, 'timestamp'] = np.round(sim_splits_df[first_split_mask]['start_time'] + \
-                                                       sim_splits_df[first_split_mask]['class_avg_time_to_split'])
+                                                                sim_splits_df[first_split_mask][
+                                                                    'class_avg_time_to_split'])
 
     # Remove competitors who have no leg_order 0
     # Identify competitors with leg_order equal to 0
@@ -146,7 +156,9 @@ def simulate_split_performance(input_split_df, split_order_perf_trend=0.0, class
                                                                           timestep_mask, 'avg_split_time'] * \
                                                                       (1 + split_order_perf_trend *
                                                                        sim_splits_df.loc[
-                                                                           timestep_mask, 'split_order']))
+                                                                           timestep_mask, 'split_order']) * \
+                                                                      (np.random.exponential(0.5, len(
+                                                                          sim_splits_df[timestep_mask])) + 1))
 
             # Calculate the timestamp for the next control sequence
             for competitor_id in sim_splits_df[timestep_mask]['competitor_id'].unique():
