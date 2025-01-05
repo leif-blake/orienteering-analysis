@@ -9,6 +9,7 @@ import numpy as np
 import sqlite3
 import random
 import os
+import ast
 
 
 def get_offset_from_local(tz: float):
@@ -243,3 +244,82 @@ def find_db_files(folder_path):
             if file.endswith(".db"):
                 db_files.append(os.path.join(root, file))
     return db_files
+
+
+def import_all_splits(db_filename: str, class_list: list[str] = None,  min_start_time=0.0, max_start_time=86400.0):
+    """
+    Imports all split times between two consecutive controls for a given race_id
+    :param db_filename: Path to the database file
+    :param class_list: List of classes to import. If empty, import all classes
+    :return: Dataframe with all legs and splits times
+    """
+
+    func_start_time = time.time()
+
+    conn = sqlite3.connect(db_filename)
+    cursor = conn.cursor()
+
+    # Create indices if they don't exist
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_results_card_no_race_id ON results(card_no, race_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_races_competitors_card_no_race_id ON races_competitors(card_no, race_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_races_competitors_class_id ON races_competitors(class_id)')
+    conn.commit()
+
+    query_start_time = time.time()
+
+    query_base = (
+        'SELECT results.race_id, start_time, controls, control_times, competitor_id, class_id FROM results INNER JOIN races_competitors '
+        'ON results.card_no = races_competitors.card_no AND results.race_id = races_competitors.race_id')
+
+    if class_list is not None:
+        query = (f'{query_base} WHERE class_id IN ({",".join(["?"] * len(class_list))})')
+        values = class_list
+        cursor.execute(query, values)
+    else:
+        query = query_base
+        cursor.execute(query)
+    rows = cursor.fetchall()
+
+    conn.close()
+
+    query_end_time = time.time()
+    print('Time to run split import query: ' + str(query_end_time - query_start_time))
+    print(f'Fetched {len(rows)} rows')
+
+    splits_dict_list = []
+
+    for row in rows:
+        race_id = row[0]
+        start_time = row[1]
+        controls = ast.literal_eval(row[2])
+        control_times = ast.literal_eval(row[3])
+        competitor_id = row[4]
+        class_id = row[5]
+
+        for i in range(len(controls) - 1):
+            control_sequence = f'{controls[i]}-{controls[i + 1]}'
+            try:
+                splits_dict = {'race_id': race_id,
+                               'ctrl_seq': control_sequence,
+                               'timestamp': control_times[i],
+                               'start_time': start_time,
+                               'competitor_id': competitor_id,
+                               'class_id': class_id,
+                               'split_time': control_times[i + 1] - control_times[i], }
+                splits_dict_list.append(splits_dict)
+            except TypeError:
+                continue  # Some of the control times are NULL for mispunches
+
+    splits_df = pd.DataFrame(splits_dict_list)
+
+    # Apply start time mask to remove invalid start times
+    start_time_mask = ((splits_df['start_time'] != None)
+                       & (splits_df['start_time'] % 86400 >= min_start_time)
+                       & (splits_df['start_time'] % 86400 <= max_start_time))
+
+    splits_df = splits_df[start_time_mask]
+
+    func_end_time = time.time()
+    print('Total time to import splits: ' + str(func_end_time - func_start_time))
+
+    return splits_df
